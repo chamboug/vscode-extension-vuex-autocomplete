@@ -4,13 +4,13 @@ module.exports = class FileReader {
     async getRootFile() {
         const files = await vscode.workspace.findFiles("**/store/**/*.js");
         const rootFile = files.find(file => file.path.endsWith("/src/store/index.js"));
-        const rootFileRaw = await this.readFile(rootFile.path);
         return {
             path: rootFile.path,
-            content: Buffer.from(rootFileRaw).toString("utf8")
+            content: await this.readFile(rootFile.path)
         }
     }
-    readFile(filePath) {
-        return vscode.workspace.fs.readFile(vscode.Uri.parse(filePath));
+    async readFile(filePath) {
+        const rawFileContent = await vscode.workspace.fs.readFile(vscode.Uri.parse(filePath));
+        return Buffer.from(rawFileContent).toString("utf8");
     }
 };
