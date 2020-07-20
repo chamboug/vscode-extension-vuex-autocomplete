@@ -1,15 +1,9 @@
-const vscode = require("vscode");
-const path = require("path");
 const cherow = require("cherow");
+const RootFileReader = require("./RootFileReader");
 
 module.exports = class VuexParser {
     async run() {
-        const files = await vscode.workspace.findFiles("**/store/**/*.js");
-        const rootFile = files.find(file => file.path.endsWith("/src/store/index.js"));
-        const rootFileRaw = await vscode.workspace.fs.readFile(vscode.Uri.parse(rootFile.path));
-        const rootFileContent = Buffer.from(rootFileRaw).toString("utf8");
-        console.log(rootFileContent);
-
+        const rootFileContent = await new RootFileReader().getRootFileContent();
         const parsedRootFileContent = cherow.parseModule(rootFileContent);
 
         const variableDeclarations = parsedRootFileContent.body.filter(x => x.type === "VariableDeclaration");
