@@ -8,28 +8,28 @@ module.exports = class VuexParser {
         this.storeTree = {};
     }
     async run() {
-        const { path: rootFilePath, content } = await this.fileReader.getRootFile();
-        const modulePaths = this.parseModules(content, true);
-        const tree = {
+        const { path: rootFilePath, content: rootFileContent } = await this.fileReader.getRootFile();
+        const tree = this.createRootTree(rootFileContent);
+        await this.fillTree(tree, rootFilePath)
+        this.storeTree = tree;
+    }
+    createRootTree(rootFileContent) {
+        const modulePaths = this.parseModules(rootFileContent, true);
+        return {
             path: ".",
             children: modulePaths.map(submodulePath => ({ path: submodulePath, children: [] }))
         };
-
-        const iterate = async (node) => {
-            for (const child of node.children) {
-                const modulePath = path.join(rootFilePath, "..", `${child.path}.js`).replace(/\\/g, "/");
-                const fileContent = await this.fileReader.readFile(modulePath);
-                const submodulePaths = this.parseModules(fileContent);
-                child.children = submodulePaths.map(submodulePath => ({ path: `${submodulePath}`, children: [] }));
-                child.children.forEach(subchild => {
-                    iterate(subchild);
-                });
-            }
-        };
-        
-        iterate(tree).then(() => {
-            console.log(tree);
-        });
+    }
+    async fillTree(node, rootFilePath) {
+        for (const child of node.children) {
+            const modulePath = path.join(rootFilePath, "..", `${child.path}.js`).replace(/\\/g, "/");
+            const fileContent = await this.fileReader.readFile(modulePath);
+            const submodulePaths = this.parseModules(fileContent);
+            child.children = submodulePaths.map(submodulePath => ({ path: `${submodulePath}`, children: [] }));
+            child.children.forEach(subchild => {
+                this.fillTree(subchild);
+            });
+        }
     }
     parseModules(fileContent, isRootFile = false) {
         const parsedFileContent = cherow.parseModule(fileContent);
