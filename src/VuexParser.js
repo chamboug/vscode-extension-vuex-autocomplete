@@ -18,36 +18,28 @@ module.exports = class VuexParser {
             // const store = new Vuex.Store({ ... });
             // export { store };
             const moduleProperties = storeVariableDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === "modules");
-            const moduleNames = moduleProperties.value.properties.map(x => x.key.name);
-            console.log(moduleNames);
+            if (moduleProperties.value.properties) {
+                const moduleNames = moduleProperties.value.properties.map(x => x.key.name);
+                console.log(moduleNames);
+            } else {
+                const modulesVariableDeclaration = variableDeclarations.find(x => x.declarations[0].id.name === "modules");
+                const moduleNames = modulesVariableDeclaration.declarations[0].init.properties.map(x => x.key.name);
+                console.log(moduleNames);
+            }
         } else {
             // export const store = new Vuex.Store({ ... });
             const exportNamedDeclarations = parsedRootFileContent.body.filter(x => x.type === "ExportNamedDeclaration");
             const storeExportNamedDeclaration = exportNamedDeclarations.find(x => x.declaration.declarations[0].id.name === "store");
             const moduleProperties = storeExportNamedDeclaration.declaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === "modules");
-            const moduleNames = moduleProperties.value.properties.map(x => x.key.name);
-            console.log(moduleNames);
+            if (moduleProperties.value.properties) {
+                const moduleNames = moduleProperties.value.properties.map(x => x.key.name);
+                console.log(moduleNames);
+            } else {
+                const modulesVariableDeclaration = variableDeclarations.find(x => x.declarations[0].id.name === "modules");
+                const moduleNames = modulesVariableDeclaration.declarations[0].init.properties.map(x => x.key.name);
+                console.log(moduleNames);
+            }
         }
-        // console.log(this.listRelevantFileImports(rootFile.path, rootFileContent).length);
 
-    }
-    listRelevantFileImports(currentFilePath, fileContent) {
-        return this.listFileImports(fileContent).filter(fileImport => this.isFileImportRelevant(currentFilePath, fileImport));
-    }
-    listFileImports(fileContent) {
-        const fileImports = [];
-        const importRegex =  /import .* from ("|')(?<fileImport>.*)("|')/gm;
-        let regexResult = null;
-        while ((regexResult = importRegex.exec(fileContent)) !== null) {
-            fileImports.push(regexResult.groups.fileImport);
-        }
-        return fileImports;
-    }
-    isFileImportRelevant(currentFilePath, fileImport) {
-        if (!/(\.\.?)\//.test(fileImport)) {
-            return false;
-        }
-        const fileFullPath = path.join(currentFilePath, "..", `${fileImport}.js`).toString().replace(/\\/g, "/");
-        return fileFullPath.indexOf("/src/store") !== -1;
     }
 };
