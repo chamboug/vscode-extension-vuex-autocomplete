@@ -1,6 +1,6 @@
 const vscode = require("vscode");
 
-module.exports = class RootFileReader {
+module.exports = class FileReader {
     async getRootFileContent() {
         const files = await vscode.workspace.findFiles("**/store/**/*.js");
         const rootFile = files.find(file => file.path.endsWith("/src/store/index.js"));

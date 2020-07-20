@@ -1,21 +1,26 @@
 const cherow = require("cherow");
-const RootFileReader = require("./RootFileReader");
+const FileReader = require("./FileReader");
 
 module.exports = class VuexParser {
     constructor() {
         this.storeTree = {};
     }
     async run() {
-        const rootFileContent = await new RootFileReader().getRootFileContent();
+        const rootFileContent = await new FileReader().getRootFileContent();
         this.parseFile(rootFileContent);
     }
     parseFile(fileContent) {
-        const parsedFileContent = cherow.parseModule(fileContent);
+        const parsedFileContent = cherow.parseModule(fileContent);console.log(parsedFileContent)
         const storeNode = this.getStoreNode(parsedFileContent);
         
         this.storeTree = ["state", "getters", "mutations", "actions", "modules"].reduce((acc, val) => {
             return { ...acc, [val]: this.getPropertyFromStoreNode(storeNode, val, parsedFileContent) };
         }, {});
+        this.storeTree.namespaced = false;
+
+        const importsDeclarations = parsedFileContent.body.filter(x => x.type === "ImportDeclaration");
+        const modulePaths = this.storeTree.modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
+        console.log(modulePaths);
 
         console.log(this.storeTree);
     }
