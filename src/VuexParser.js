@@ -1,4 +1,5 @@
 const cherow = require("cherow");
+const path = require("path");
 const FileReader = require("./FileReader");
 
 module.exports = class VuexParser {
@@ -6,23 +7,25 @@ module.exports = class VuexParser {
         this.storeTree = {};
     }
     async run() {
-        const rootFileContent = await new FileReader().getRootFileContent();
-        this.parseFile(rootFileContent);
+        const { path, content } = await new FileReader().getRootFile();
+        const modulePaths = this.parseModules(content);
+
+        const listPaths = data => {
+            data.map(modulePath => ({ path: path.join(filePath, modulePath) })).reduce((acc, val) => {
+                const submodulePaths = await this.parseModules(val.path);
+            }, []);
+        };
+        const paths = listPaths(modulePaths);
+        console.log(paths);
     }
-    parseFile(fileContent) {
-        const parsedFileContent = cherow.parseModule(fileContent);console.log(parsedFileContent)
+    parseModules(fileContent) {
+        const parsedFileContent = cherow.parseModule(fileContent);
         const storeNode = this.getStoreNode(parsedFileContent);
-        
-        this.storeTree = ["state", "getters", "mutations", "actions", "modules"].reduce((acc, val) => {
-            return { ...acc, [val]: this.getPropertyFromStoreNode(storeNode, val, parsedFileContent) };
-        }, {});
-        this.storeTree.namespaced = false;
+        const modules = this.getPropertyFromStoreNode(storeNode, "modules", parsedFileContent);
 
         const importsDeclarations = parsedFileContent.body.filter(x => x.type === "ImportDeclaration");
-        const modulePaths = this.storeTree.modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
-        console.log(modulePaths);
-
-        console.log(this.storeTree);
+        const modulePaths = modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
+        return modulePaths;
     }
     getStoreNode(parsedFileContent) {
         const variableDeclarations = parsedFileContent.body.filter(x => x.type === "VariableDeclaration");
