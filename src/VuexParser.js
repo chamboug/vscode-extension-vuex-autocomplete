@@ -13,16 +13,9 @@ module.exports = class VuexParser {
         const parsedFileContent = cherow.parseModule(fileContent);
         const storeNode = this.getStoreNode(parsedFileContent);
         
-        const state = this.getPropertyFromStoreNode(storeNode, "state", parsedFileContent);
-        this.storeTree.state = state;
-        const getters = this.getPropertyFromStoreNode(storeNode, "getters", parsedFileContent);
-        this.storeTree.getters = getters;
-        const mutations = this.getPropertyFromStoreNode(storeNode, "mutations", parsedFileContent);
-        this.storeTree.mutations = mutations;
-        const actions = this.getPropertyFromStoreNode(storeNode, "actions", parsedFileContent);
-        this.storeTree.actions = actions;
-        const modules = this.getPropertyFromStoreNode(storeNode, "modules", parsedFileContent);
-        this.storeTree.modules = modules;
+        this.storeTree = ["state", "getters", "mutations", "actions", "modules"].reduce((acc, val) => {
+            return { ...acc, [val]: this.getPropertyFromStoreNode(storeNode, val, parsedFileContent) };
+        }, {});
 
         console.log(this.storeTree);
     }
