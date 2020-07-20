@@ -2,6 +2,9 @@ const cherow = require("cherow");
 const RootFileReader = require("./RootFileReader");
 
 module.exports = class VuexParser {
+    constructor() {
+        this.storeTree = {};
+    }
     async run() {
         const rootFileContent = await new RootFileReader().getRootFileContent();
         this.parseFile(rootFileContent);
@@ -9,8 +12,19 @@ module.exports = class VuexParser {
     parseFile(fileContent) {
         const parsedFileContent = cherow.parseModule(fileContent);
         const storeNode = this.getStoreNode(parsedFileContent);
+        
+        const state = this.getPropertyFromStoreNode(storeNode, "state", parsedFileContent);
+        this.storeTree.state = state;
+        const getters = this.getPropertyFromStoreNode(storeNode, "getters", parsedFileContent);
+        this.storeTree.getters = getters;
+        const mutations = this.getPropertyFromStoreNode(storeNode, "mutations", parsedFileContent);
+        this.storeTree.mutations = mutations;
+        const actions = this.getPropertyFromStoreNode(storeNode, "actions", parsedFileContent);
+        this.storeTree.actions = actions;
         const modules = this.getPropertyFromStoreNode(storeNode, "modules", parsedFileContent);
-        console.log(modules);
+        this.storeTree.modules = modules;
+
+        console.log(this.storeTree);
     }
     getStoreNode(parsedFileContent) {
         const variableDeclarations = parsedFileContent.body.filter(x => x.type === "VariableDeclaration");
@@ -28,6 +42,10 @@ module.exports = class VuexParser {
             propertyNode = storeNode.storeDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
         } else { // ExportNamedDeclaration
             propertyNode = storeNode.storeDeclaration.declaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
+        }
+
+        if (!propertyNode) {
+            return [];
         }
 
         if (propertyNode.value.properties) {
