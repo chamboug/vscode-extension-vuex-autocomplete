@@ -17,11 +17,17 @@ module.exports = class VuexParser {
     createRootTree(rootFileContent, rootFilePath) {
         const ast = this.getASTFromFileContent(rootFileContent);
         const storeNode = this.getCurrentStoreNode(ast, true);
-        const modulePaths = this.parseModulePaths(storeNode, ast);
+        const { modulePaths, moduleNames } = this.parseModulePaths(storeNode, ast);
         return {
             path: rootFilePath,
             namespaced: false,
-            children: modulePaths.map(submodulePath => ({ path: path.join(rootFilePath, submodulePath), children: [] }))
+            namespacePrefix: "",
+            children: modulePaths.map((submodulePath, submodulePathIndex) => ({ 
+                namespacePrefix: "",
+                moduleName: moduleNames[submodulePathIndex],
+                path: path.join(rootFilePath, submodulePath),
+                children: []
+            }))
         };
     }
     async fillTree(node) {
@@ -39,23 +45,32 @@ module.exports = class VuexParser {
                 child.namespaced = false;
             }
 
+            if (child.namespaced) {
+                child.namespacePrefix = `${child.namespacePrefix}${child.moduleName}/`;
+            }
+
             ["state", "getters", "mutations", "actions"].forEach(propertyType => {
                 child[propertyType] = this.listPropertyNamesFromStoreNode(storeNode, propertyType, ast);
             });
 
             // Sub-modules
-            const submodulePaths = this.parseModulePaths(storeNode, ast);
-            child.children = submodulePaths.map(submodulePath => ({ path: path.join(child.path, "..", submodulePath), children: [] }));
+            const { modulePaths: submodulePaths, moduleNames: submoduleNames } = this.parseModulePaths(storeNode, ast);
+            child.children = submodulePaths.map((submodulePath, submodulePathIndex) => ({
+                namespacePrefix: child.namespacePrefix,
+                moduleName: submoduleNames[submodulePathIndex],
+                path: path.join(child.path, "..", submodulePath),
+                children: []
+            }));
             if (child.children.length > 0) {
                 await this.fillTree(child);
             }
         }
     }
     parseModulePaths(storeNode, ast) {
-        const modules = this.listPropertyNamesFromStoreNode(storeNode, "modules", ast);
+        const moduleNames = this.listPropertyNamesFromStoreNode(storeNode, "modules", ast);
         const importsDeclarations = ast.body.filter(x => x.type === "ImportDeclaration");
-        const modulePaths = modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
-        return modulePaths;
+        const modulePaths = moduleNames.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
+        return { modulePaths, moduleNames };
     }
     getASTFromFileContent(fileContent) {
         return parse(fileContent, { sourceType: "module" }).program;
