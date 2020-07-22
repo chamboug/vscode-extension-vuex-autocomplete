@@ -17,7 +17,7 @@ module.exports = class VuexParser {
     createRootTree(rootFileContent) {
         const ast = this.getASTFromFileContent(rootFileContent);
         const storeNode = this.getCurrentStoreNode(ast, true);
-        const modulePaths = this.parseModules(storeNode, ast);
+        const modulePaths = this.parseModulePaths(storeNode, ast);
         return {
             path: ".",
             children: modulePaths.map(submodulePath => ({ path: submodulePath, children: [] }))
@@ -29,15 +29,16 @@ module.exports = class VuexParser {
             const fileContent = await this.fileReader.readFile(modulePath);
             const ast = this.getASTFromFileContent(fileContent);
             const storeNode = this.getCurrentStoreNode(ast);
-            const submodulePaths = this.parseModules(storeNode, ast);
+            const submodulePaths = this.parseModulePaths(storeNode, ast);
             child.children = submodulePaths.map(submodulePath => ({ path: `${submodulePath}`, children: [] }));
             child.children.forEach(subchild => {
                 this.fillTree(subchild);
             });
         }
     }
-    parseModules(storeNode, ast) {
-        const modules = this.getPropertyFromStoreNode(storeNode, "modules", ast);
+    parseModulePaths(storeNode, ast) {
+        const moduleNode = this.getPropertyNodeFromStoreNode(storeNode, "modules");
+        const modules = this.getPropertyFromPropertyNode(moduleNode, "modules", ast);
         const importsDeclarations = ast.body.filter(x => x.type === "ImportDeclaration");
         const modulePaths = modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
         return modulePaths;
@@ -67,20 +68,19 @@ module.exports = class VuexParser {
         const storeExportNamedDeclaration = exportNamedDeclarations.find(x => x.declaration.declarations[0].id.name === "store");
         return { declarationType: "ExportNamedDeclaration", storeDeclaration: storeExportNamedDeclaration };
     }
-    getPropertyFromStoreNode(storeNode, propertyName, ast) {
-        let propertyNode;
+    getPropertyNodeFromStoreNode(storeNode, propertyName) {
         if (storeNode.declarationType === "VariableDeclaration") {
-            propertyNode = storeNode.storeDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
+            return storeNode.storeDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
         } else if (storeNode.declarationType === "ExportNamedDeclaration") {
-            propertyNode = storeNode.storeDeclaration.declaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
-        } else { // ExportDefaultDeclaration
-            propertyNode = storeNode.storeDeclaration.declaration.properties.find(x => x.key.name === propertyName);
+            return storeNode.storeDeclaration.declaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
         }
-
+        // ExportDefaultDeclaration
+        return storeNode.storeDeclaration.declaration.properties.find(x => x.key.name === propertyName);
+    }
+    getPropertyFromPropertyNode(propertyNode, propertyName, ast) {
         if (!propertyNode) {
             return [];
         }
-
         if (propertyNode.value.properties) {
             return propertyNode.value.properties.map(x => x.key.name);
         }
