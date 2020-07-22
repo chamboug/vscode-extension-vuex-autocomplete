@@ -15,7 +15,9 @@ module.exports = class VuexParser {
         console.log(this.storeTree);
     }
     createRootTree(rootFileContent) {
-        const modulePaths = this.parseModules(rootFileContent, true);
+        const ast = this.getASTFromFileContent(rootFileContent);
+        const storeNode = this.getCurrentStoreNode(ast, true);
+        const modulePaths = this.parseModules(storeNode, ast);
         return {
             path: ".",
             children: modulePaths.map(submodulePath => ({ path: submodulePath, children: [] }))
@@ -25,44 +27,47 @@ module.exports = class VuexParser {
         for (const child of node.children) {
             const modulePath = path.join(rootFilePath, "..", `${child.path}.js`).replace(/\\/g, "/");
             const fileContent = await this.fileReader.readFile(modulePath);
-            const submodulePaths = this.parseModules(fileContent);
+            const ast = this.getASTFromFileContent(fileContent);
+            const storeNode = this.getCurrentStoreNode(ast);
+            const submodulePaths = this.parseModules(storeNode, ast);
             child.children = submodulePaths.map(submodulePath => ({ path: `${submodulePath}`, children: [] }));
             child.children.forEach(subchild => {
                 this.fillTree(subchild);
             });
         }
     }
-    parseModules(fileContent, isRootFile = false) {
-        const parsedFileContent = parse(fileContent, { sourceType: "module" }).program;
-        let storeNode;
-        if (isRootFile) {
-            storeNode = this.getStoreNode(parsedFileContent);
-        } else {
-            storeNode = this.getModuleNode(parsedFileContent);
-        }
-        const modules = this.getPropertyFromStoreNode(storeNode, "modules", parsedFileContent);
-
-        const importsDeclarations = parsedFileContent.body.filter(x => x.type === "ImportDeclaration");
+    parseModules(storeNode, ast) {
+        const modules = this.getPropertyFromStoreNode(storeNode, "modules", ast);
+        const importsDeclarations = ast.body.filter(x => x.type === "ImportDeclaration");
         const modulePaths = modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
         return modulePaths;
     }
-    getModuleNode(parsedFileContent) {
+    getASTFromFileContent(fileContent) {
+        return parse(fileContent, { sourceType: "module" }).program;
+    }
+    getCurrentStoreNode(ast, isRootFile = false) {
+        if (isRootFile) {
+            return this.getRootStoreNode(ast);
+        }
+        return this.getModuleNode(ast);
+    }
+    getModuleNode(ast) {
         return {
             declarationType: "ExportDefaultDeclaration",
-            storeDeclaration: parsedFileContent.body.find(x => x.type === "ExportDefaultDeclaration")
+            storeDeclaration: ast.body.find(x => x.type === "ExportDefaultDeclaration")
         };
     }
-    getStoreNode(parsedFileContent) {
-        const variableDeclarations = parsedFileContent.body.filter(x => x.type === "VariableDeclaration");
+    getRootStoreNode(ast) {
+        const variableDeclarations = ast.body.filter(x => x.type === "VariableDeclaration");
         const storeVariableDeclaration = variableDeclarations.find(x => x.declarations[0].id.name === "store");
         if (storeVariableDeclaration) {
             return { declarationType: "VariableDeclaration", storeDeclaration: storeVariableDeclaration };
         }
-        const exportNamedDeclarations = parsedFileContent.body.filter(x => x.type === "ExportNamedDeclaration");
+        const exportNamedDeclarations = ast.body.filter(x => x.type === "ExportNamedDeclaration");
         const storeExportNamedDeclaration = exportNamedDeclarations.find(x => x.declaration.declarations[0].id.name === "store");
         return { declarationType: "ExportNamedDeclaration", storeDeclaration: storeExportNamedDeclaration };
     }
-    getPropertyFromStoreNode(storeNode, propertyName, parsedFileContent) {
+    getPropertyFromStoreNode(storeNode, propertyName, ast) {
         let propertyNode;
         if (storeNode.declarationType === "VariableDeclaration") {
             propertyNode = storeNode.storeDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
@@ -79,7 +84,7 @@ module.exports = class VuexParser {
         if (propertyNode.value.properties) {
             return propertyNode.value.properties.map(x => x.key.name);
         }
-        const variableDeclarations = parsedFileContent.body.filter(x => x.type === "VariableDeclaration");
+        const variableDeclarations = ast.body.filter(x => x.type === "VariableDeclaration");
         const modulesVariableDeclaration = variableDeclarations.find(x => x.declarations[0].id.name === propertyName);
         return modulesVariableDeclaration.declarations[0].init.properties.map(x => x.key.name);
     }
