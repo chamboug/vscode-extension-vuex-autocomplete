@@ -1,4 +1,4 @@
-const cherow = require("cherow");
+const { parse } = require("@babel/parser");
 const path = require("path");
 const FileReader = require("./FileReader");
 
@@ -12,6 +12,7 @@ module.exports = class VuexParser {
         const tree = this.createRootTree(rootFileContent);
         await this.fillTree(tree, rootFilePath)
         this.storeTree = tree;
+        console.log(this.storeTree);
     }
     createRootTree(rootFileContent) {
         const modulePaths = this.parseModules(rootFileContent, true);
@@ -32,7 +33,7 @@ module.exports = class VuexParser {
         }
     }
     parseModules(fileContent, isRootFile = false) {
-        const parsedFileContent = cherow.parseModule(fileContent);
+        const parsedFileContent = parse(fileContent, { sourceType: "module" }).program;
         let storeNode;
         if (isRootFile) {
             storeNode = this.getStoreNode(parsedFileContent);
