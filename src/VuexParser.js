@@ -9,36 +9,50 @@ module.exports = class VuexParser {
     }
     async run() {
         const { path: rootFilePath, content: rootFileContent } = await this.fileReader.getRootFile();
-        const tree = this.createRootTree(rootFileContent);
-        await this.fillTree(tree, rootFilePath)
+        const tree = this.createRootTree(rootFileContent, path.join(rootFilePath, ".."));
+        await this.fillTree(tree);
         this.storeTree = tree;
         console.log(this.storeTree);
     }
-    createRootTree(rootFileContent) {
+    createRootTree(rootFileContent, rootFilePath) {
         const ast = this.getASTFromFileContent(rootFileContent);
         const storeNode = this.getCurrentStoreNode(ast, true);
         const modulePaths = this.parseModulePaths(storeNode, ast);
         return {
-            path: ".",
-            children: modulePaths.map(submodulePath => ({ path: submodulePath, children: [] }))
+            path: rootFilePath,
+            namespaced: false,
+            children: modulePaths.map(submodulePath => ({ path: path.join(rootFilePath, submodulePath), children: [] }))
         };
     }
-    async fillTree(node, rootFilePath) {
+    async fillTree(node) {
         for (const child of node.children) {
-            const modulePath = path.join(rootFilePath, "..", `${child.path}.js`).replace(/\\/g, "/");
+            const modulePath = path.join(`${child.path}.js`).replace(/\\/g, "/");
             const fileContent = await this.fileReader.readFile(modulePath);
             const ast = this.getASTFromFileContent(fileContent);
             const storeNode = this.getCurrentStoreNode(ast);
-            const submodulePaths = this.parseModulePaths(storeNode, ast);
-            child.children = submodulePaths.map(submodulePath => ({ path: `${submodulePath}`, children: [] }));
-            child.children.forEach(subchild => {
-                this.fillTree(subchild);
+
+            // Namespaced
+            const namespacedNode = this.getPropertyNodeFromStoreNode(storeNode, "namespaced");
+            if (namespacedNode && namespacedNode.value.value) {
+                child.namespaced = true;
+            } else {
+                child.namespaced = false;
+            }
+
+            ["state", "getters", "mutations", "actions"].forEach(propertyType => {
+                child[propertyType] = this.listPropertyNamesFromStoreNode(storeNode, propertyType, ast);
             });
+
+            // Sub-modules
+            const submodulePaths = this.parseModulePaths(storeNode, ast);
+            child.children = submodulePaths.map(submodulePath => ({ path: path.join(child.path, "..", submodulePath), children: [] }));
+            if (child.children.length > 0) {
+                await this.fillTree(child);
+            }
         }
     }
     parseModulePaths(storeNode, ast) {
-        const moduleNode = this.getPropertyNodeFromStoreNode(storeNode, "modules");
-        const modules = this.getPropertyFromPropertyNode(moduleNode, "modules", ast);
+        const modules = this.listPropertyNamesFromStoreNode(storeNode, "modules", ast);
         const importsDeclarations = ast.body.filter(x => x.type === "ImportDeclaration");
         const modulePaths = modules.map(moduleName => importsDeclarations.find(x => x.specifiers[0].local.name === moduleName).source.value);
         return modulePaths;
@@ -68,6 +82,10 @@ module.exports = class VuexParser {
         const storeExportNamedDeclaration = exportNamedDeclarations.find(x => x.declaration.declarations[0].id.name === "store");
         return { declarationType: "ExportNamedDeclaration", storeDeclaration: storeExportNamedDeclaration };
     }
+    listPropertyNamesFromStoreNode(storeNode, propertyName, ast) {
+        const propertyNode = this.getPropertyNodeFromStoreNode(storeNode, propertyName);
+        return this.listPropertyNamesFromPropertyNode(propertyNode, propertyName, ast);
+    }
     getPropertyNodeFromStoreNode(storeNode, propertyName) {
         if (storeNode.declarationType === "VariableDeclaration") {
             return storeNode.storeDeclaration.declarations[0].init.arguments[0].properties.find(x => x.key.name === propertyName);
@@ -77,7 +95,7 @@ module.exports = class VuexParser {
         // ExportDefaultDeclaration
         return storeNode.storeDeclaration.declaration.properties.find(x => x.key.name === propertyName);
     }
-    getPropertyFromPropertyNode(propertyNode, propertyName, ast) {
+    listPropertyNamesFromPropertyNode(propertyNode, propertyName, ast) {
         if (!propertyNode) {
             return [];
         }
