@@ -7,7 +7,8 @@ module.exports = class VuexCompletion {
             {
                 provideCompletionItems(document, position) {
                     const linePrefix = document.lineAt(position).text.substr(0, position.character);
-                    if (!linePrefix.endsWith('...mapState("')) {
+                    const triggerFunctions = ["mapState", "mapGetters", "mapMutations", "mapActions"];
+                    if (triggerFunctions.every(f => !linePrefix.endsWith(`...${f}("`))) {
                         return undefined;
                     }
     
