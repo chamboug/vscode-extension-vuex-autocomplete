@@ -1,8 +1,15 @@
 const vscode = require("vscode");
 
-module.exports = class VuexCompletion {
+class VuexCompletion {
+    constructor() {
+        this.disposable = null;
+    }
+
     registerCompletionItems(completionItems) {
-        vscode.languages.registerCompletionItemProvider(
+        if (this.disposable) {
+            this.disposable.dispose();
+        }
+        this.disposable = vscode.languages.registerCompletionItemProvider(
             "vue",
             {
                 provideCompletionItems(document, position) {
@@ -19,3 +26,7 @@ module.exports = class VuexCompletion {
         );
     }
 };
+
+const vuexCompletion = new VuexCompletion();
+
+module.exports = vuexCompletion;

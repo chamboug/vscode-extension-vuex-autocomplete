@@ -1,12 +1,12 @@
 const { parse } = require("@babel/parser");
 const path = require("path");
 const FileReader = require("./FileReader");
-const VuexCompletion = require("./VuexCompletion");
+const vuexCompletion = require("./VuexCompletion");
 
 module.exports = class VuexParser {
     constructor() {
         this.fileReader = new FileReader();
-        this.vuexCompletion = new VuexCompletion();
+        this.vuexCompletion = vuexCompletion;
         this.storeTree = {};
     }
     async run() {
