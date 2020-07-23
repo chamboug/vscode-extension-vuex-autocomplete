@@ -1,7 +1,7 @@
 const vscode = require("vscode");
 
-module.exports = class VuexParser {
-    run() {
+module.exports = class VuexCompletion {
+    registerCompletionItems(completionItems) {
         vscode.languages.registerCompletionItemProvider(
             "vue",
             {
@@ -11,10 +11,7 @@ module.exports = class VuexParser {
                         return undefined;
                     }
     
-                    return [
-                        new vscode.CompletionItem('app/module1', vscode.CompletionItemKind.Text),
-                        new vscode.CompletionItem('app/module2', vscode.CompletionItemKind.Text),
-                    ];
+                    return completionItems.map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
                 }
             },
             "."
