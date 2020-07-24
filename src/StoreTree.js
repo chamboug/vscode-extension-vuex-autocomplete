@@ -3,14 +3,14 @@ module.exports = class StoreTree {
         this.tree = tree;
     }
     flat() {
-        return this.flattenTree(this.tree, []);
+        return this.recursiveFlattenTree(this.tree, []);
     }
-    flattenTree(node, acc) {
+    recursiveFlattenTree(node, acc) {
         const { children, ...nodeWithoutChildren } = node;
         return [
             ...acc,
             nodeWithoutChildren,
-            ...node.children.reduce((acc, val) => acc.concat(this.flattenTree(val, [])), [])
+            ...node.children.reduce((acc, val) => acc.concat(this.recursiveFlattenTree(val, [])), [])
         ]
     }
     listNamespaces() {
