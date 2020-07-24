@@ -1,11 +1,11 @@
 const vscode = require("vscode");
 
-class VuexCompletion {
+class CodeCompletion {
     constructor() {
         this.disposable = null;
     }
 
-    registerCompletionItems(completionItems) {
+    registerCompletionItems(storeTree) {
         if (this.disposable) {
             this.disposable.dispose();
         }
@@ -19,7 +19,7 @@ class VuexCompletion {
                         return undefined;
                     }
     
-                    return completionItems.map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
+                    return storeTree.listNamespaces().map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
                 }
             },
             "."
@@ -27,6 +27,6 @@ class VuexCompletion {
     }
 };
 
-const vuexCompletion = new VuexCompletion();
+const codeCompletion = new CodeCompletion();
 
-module.exports = vuexCompletion;
+module.exports = codeCompletion;

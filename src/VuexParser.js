@@ -1,33 +1,17 @@
 const { parse } = require("@babel/parser");
 const path = require("path");
 const FileReader = require("./FileReader");
-const vuexCompletion = require("./VuexCompletion");
+const StoreTree = require("./StoreTree");
 
 module.exports = class VuexParser {
     constructor() {
         this.fileReader = new FileReader();
-        this.vuexCompletion = vuexCompletion;
-        this.storeTree = {};
     }
-    async run() {
+    async generateStoreTree() {
         const { path: rootFilePath, content: rootFileContent } = await this.fileReader.getRootFile();
         const tree = this.createRootTree(rootFileContent, path.join(rootFilePath, ".."));
         await this.fillTree(tree);
-        this.storeTree = tree;
-        const flattenedTree = this.flattenTree(this.storeTree, []);
-        const namespacePrefixes = flattenedTree.map(x => x.namespacePrefix);
-        const sanitizedNamespacePrefixes = namespacePrefixes
-            .filter(x => !!x)
-            .map(x => x.endsWith("/") ? x.slice(0, -1) : x );
-        this.vuexCompletion.registerCompletionItems(sanitizedNamespacePrefixes);
-    }
-    flattenTree(node, acc) {
-        const { children, ...nodeWithoutChildren } = node;
-        return [
-            ...acc,
-            nodeWithoutChildren,
-            ...node.children.reduce((acc, val) => acc.concat(this.flattenTree(val, [])), [])
-        ]
+        return new StoreTree(tree);
     }
     createRootTree(rootFileContent, rootFilePath) {
         const ast = this.getASTFromFileContent(rootFileContent);

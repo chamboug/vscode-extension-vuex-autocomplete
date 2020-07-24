@@ -1,21 +1,28 @@
 const vscode = require('vscode');
-const VuexCompletion = require('./src/VuexCompletion');
 const VuexParser = require('./src/VuexParser');
+const codeCompletionInstance = require("./src/CodeCompletion");
 
 const vuexParser = new VuexParser();
 
-/**
- * @param {vscode.ExtensionContext} context
- */
-function activate(context) {
-    vuexParser.run();
-    vscode.workspace.onDidSaveTextDocument(() => {
-        vuexParser.run();
+const activate = () => {
+    updateCompletion();
+    vscode.workspace.onDidSaveTextDocument(event => {
+        if (!/.*\/src\/store\/.*/.test(event.uri.path)) {
+            return;
+        }
+        updateCompletion();
     });
-}
-exports.activate = activate;
+};
 
-function deactivate() {}
+const updateCompletion = () => {
+    vuexParser.generateStoreTree().then(storeTree => {
+        codeCompletionInstance.registerCompletionItems(storeTree);
+    });
+};
+
+const deactivate = () => {};
+
+exports.activate = activate;
 
 module.exports = {
 	activate,
