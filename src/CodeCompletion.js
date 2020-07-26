@@ -14,7 +14,7 @@ class CodeCompletion {
         this.disposable = vscode.languages.registerCompletionItemProvider(
             "vue",
             {
-                provideCompletionItems(document, position) {
+                provideCompletionItems: (document, position) => {
                     try {
                         const linePrefix = document.lineAt(position).text.substr(0, position.character);
                         const triggerFunctions = ["mapState", "mapGetters", "mapMutations", "mapActions"];
@@ -22,27 +22,13 @@ class CodeCompletion {
                             return storeTree.listNamespaces().map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
                         } else {
                             const scriptLineIndex = document.getText().split("\n").findIndex(l => /<script>/.test(l));
-                            const scriptContent = document.getText().split("<script>")[1].split("</script>")[0];
-                            const ast = parse(scriptContent, { sourceType: "module" });
-                            const componentNode = esquery(ast, "ExportDefaultDeclaration")[0];
+                            const componentNode = this.getComponentNode(document);
+                            const matchingMapFunctionNode = this.getMatchingFunctionNode(scriptLineIndex, componentNode, position);
 
-                            const computedPropertiesNode = esquery(componentNode, "ObjectProperty[key.name=\"computed\"]")[0];
-                            const matchingMapFunction = ["mapState", "mapGetters"].map(f => esquery(computedPropertiesNode, `SpreadElement[loc.start.line<=${position.line - scriptLineIndex + 1}][loc.end.line>=${position.line - scriptLineIndex + 1}][argument.callee.name="${f}"]`)).find(x => x.length > 0);
-                            if (matchingMapFunction) {
-                                const matchingMapFunctionName = esquery(matchingMapFunction[0], "Identifier")[0].name;
-                                const [namespace, ...attributes] = esquery(matchingMapFunction[0], "StringLiteral");
-                                const matchingAttributes = storeTree.getNodeByNamespacePrefix(namespace.value)[matchingMapFunctionName.toLowerCase().slice(3)];
-                                return matchingAttributes.map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
-                            } else {
-                                const methodsPropertiesNode = esquery(componentNode, "ObjectProperty[key.name=\"methods\"]")[0];
-                                const matchingMapFunction = ["mapMutations", "mapActions"].map(f => esquery(methodsPropertiesNode, `SpreadElement[loc.start.line<=${position.line - scriptLineIndex + 1}][loc.end.line>=${position.line - scriptLineIndex + 1}][argument.callee.name="${f}"]`)).find(x => x.length > 0);
-                                if (matchingMapFunction) {
-                                    const matchingMapFunctionName = esquery(matchingMapFunction[0], "Identifier")[0].name;
-                                    const [namespace, ...attributes] = esquery(matchingMapFunction[0], "StringLiteral");
-                                    const matchingAttributes = storeTree.getNodeByNamespacePrefix(namespace.value)[matchingMapFunctionName.toLowerCase().slice(3)];
-                                    return matchingAttributes.map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
-                                }
-                            }
+                            const matchingMapFunctionName = esquery(matchingMapFunctionNode, "Identifier")[0].name;
+                            const [namespace, ...attributes] = esquery(matchingMapFunctionNode, "StringLiteral");
+                            const matchingAttributes = storeTree.getNodeByNamespacePrefix(namespace.value)[matchingMapFunctionName.toLowerCase().slice(3)];
+                            return matchingAttributes.map(item => new vscode.CompletionItem(item, vscode.CompletionItemKind.Text));
                         }
                     } catch (e) {
                         console.log(e)
@@ -53,6 +39,23 @@ class CodeCompletion {
             },
             "."
         );
+    }
+    getComponentNode(document) {
+        const scriptContent = document.getText().split("<script>")[1].split("</script>")[0];
+        const ast = parse(scriptContent, { sourceType: "module" });
+        return esquery(ast, "ExportDefaultDeclaration")[0];
+    }
+    getMatchingFunctionNode(scriptLineIndex, componentNode, position) {
+        const componentSections = { computed: ["mapState", "mapGetters"], methods: ["mapMutations", "mapActions"]};
+        for (const key of Object.keys(componentSections)) {
+            const computedPropertiesNode = esquery(componentNode, `ObjectProperty[key.name="${key}"]`)[0];
+            const query = functionName => `SpreadElement[loc.start.line<=${position.line - scriptLineIndex + 1}][loc.end.line>=${position.line - scriptLineIndex + 1}][argument.callee.name="${functionName}"]`;
+            const matchingMapFunctionNodes = componentSections[key].map(f => esquery(computedPropertiesNode, query(f))).find(x => x.length > 0);
+            if (matchingMapFunctionNodes) {
+                return matchingMapFunctionNodes[0];
+            }
+        }
+        return null;
     }
 };
 
