@@ -42,7 +42,7 @@ class CodeCompletion {
     }
     getComponentNode(document) {
         const scriptContent = document.getText().split("<script>")[1].split("</script>")[0];
-        const ast = parse(scriptContent, { sourceType: "module" });
+        const ast = parse(scriptContent, { sourceType: "module", errorRecovery: true });
         return esquery(ast, "ExportDefaultDeclaration")[0];
     }
     getMatchingFunctionNode(scriptLineIndex, componentNode, position) {
